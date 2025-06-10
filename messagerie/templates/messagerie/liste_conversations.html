@@ -1,0 +1,75 @@
+{% extends 'messagerie/base.html' %}
+
+{% block title %}Mes conversations{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Mes conversations</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% if conversations_affichees %}
+    {% for conv in conversations_affichees %}
+        <a href="{% url 'conversation_detail' conv.id %}" class="list-group-item list-group-item-action">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    {% if conv.nom_affichage %}
+                        {{ conv.nom_affichage }}
+                    {% else %}
+                        Conversation
+                    {% endif %}
+                </div>
+                <small class="text-muted">
+                    {% if conv.dernier_message %}
+                        {{ conv.dernier_message.date_envoi|date:"H:i d/m/Y" }}
+                    {% endif %}
+                </small>
+            </div>
+            {% if conv.dernier_message %}
+            <div class="mt-1 text-muted small">
+                <strong>{{ conv.dernier_message.expediteur.nom }} :</strong>
+                {{ conv.dernier_message.contenu_dechiffre|truncatechars:40 }}
+            </div>
+            {% endif %}
+        </a>
+    {% endfor %}
+{% else %}
+
+                    <div class="list-group-item">
+                        Aucune conversation. Commencez à discuter avec quelqu'un !
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Démarrer une nouvelle conversation</h5>
+            </div>
+            <div class="card-body">
+                <p>Sélectionnez un utilisateur pour commencer une conversation :</p>
+                <div class="list-group">
+                    {% for utilisateur in utilisateurs %}
+                    <a href="{% url 'nouvelle_conversation' utilisateur.id %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex align-items-center">
+                            {% if utilisateur.statut.est_en_ligne %}
+                            <span class="online-indicator"></span>
+                            {% else %}
+                            <span class="offline-indicator"></span>
+                            {% endif %}
+                            {{ utilisateur.nom }}
+                        </div>
+                    </a>
+                    {% empty %}
+                    <div class="list-group-item">Aucun autre utilisateur disponible</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

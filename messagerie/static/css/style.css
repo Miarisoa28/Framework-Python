@@ -1,0 +1,150 @@
+/* messagerie/static/css/style.css ou similaire */
+
+.online-indicator, .offline-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.online-indicator {
+    background-color: green;
+}
+
+.offline-indicator {
+    background-color: gray;
+}
+
+/* Styles pour la zone de message */
+.message-container {
+    height: 60vh; /* Hauteur fixe pour le conteneur de messages */
+    overflow-y: auto; /* Active le défilement vertical */
+    padding: 15px;
+    display: flex;
+    flex-direction: column; /* Pour que les messages s'empilent */
+}
+
+.message {
+    max-width: 75%;
+    padding: 10px 15px;
+    border-radius: 15px;
+    margin-bottom: 10px;
+    line-height: 1.4;
+    word-wrap: break-word; /* Pour les longs mots */
+}
+
+.message.sent {
+    align-self: flex-end; /* Alignement à droite pour les messages envoyés */
+    background-color: #dcf8c6; /* Couleur WhatsApp */
+    color: #333;
+}
+
+.message.received {
+    align-self: flex-start; /* Alignement à gauche pour les messages reçus */
+    background-color: #e6e6e6; /* Couleur WhatsApp */
+    color: #333;
+}
+
+.message strong {
+    font-size: 0.9em;
+    color: #075e54; /* Une couleur qui contraste bien */
+    margin-bottom: 5px;
+    display: block; /* Pour que le nom soit au-dessus du contenu */
+}
+
+.message-content {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+.message-content p {
+    margin: 0;
+}
+
+.message-meta {
+    font-size: 0.75em;
+    color: #777;
+    margin-top: 5px;
+}
+
+/* Styles pour le formulaire d'envoi */
+.card-footer .input-group {
+    display: flex;
+    align-items: center;
+}
+
+.card-footer .input-group textarea {
+    flex-grow: 1;
+    border-radius: 20px; /* Bords arrondis pour le champ texte */
+    padding: 10px 15px;
+    border-color: #ddd;
+    resize: none; /* Empêche le redimensionnement manuel */
+}
+
+.card-footer .btn {
+    border-radius: 20px; /* Bords arrondis pour les boutons */
+    margin-left: 5px;
+    padding: 10px 15px;
+}
+
+/* Masquer les champs input type="file" réels */
+.card-footer input[type="file"] {
+    display: none; 
+}
+
+/* Style pour les labels qui agissent comme des boutons */
+.attachment-btn, .audio-btn {
+    cursor: pointer;
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    color: #555;
+    transition: background-color 0.2s;
+}
+
+.attachment-btn:hover, .audio-btn:hover {
+    background-color: #e0e0e0;
+}
+
+.audio-btn.recording {
+    background-color: #dc3545; /* Rouge pour l'enregistrement */
+    color: white;
+}
+
+/* Style pour le lecteur audio de prévisualisation */
+#audio-playback {
+    width: 100%; /* S'adapte à la largeur du conteneur */
+    margin-top: 10px;
+    display: block; /* S'assure qu'il prend sa propre ligne */
+}
+
+/* Styles pour les liens de téléchargement de fichiers */
+.message-content a.download-encrypted-file {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px; /* Espace entre l'icône et le texte */
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 5px 10px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #007bff;
+    margin-top: 5px;
+}
+
+.message-content a.download-encrypted-file:hover {
+    background-color: #e9ecef;
+    text-decoration: underline;
+}
+
+.message-content audio.play-encrypted-audio {
+    width: 100%;
+    margin-top: 5px;
+}
+
+/* Styles responsive */
+@media (max-width: 768px) {
+    .message {
+        max-width: 90%;
+    }
+}

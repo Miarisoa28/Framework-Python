@@ -1,0 +1,16 @@
+-Données personnelles, mettre les libéllés(nom: ...,)
+-Etudes universitaires:
+par ordre chronologique du plus récent
+Année universitaire,Niveau d'études, filière, Université
+ex: 2025,Licence3, Informatique, Risques et Décision, ESMIA
+-Formation et Compétence
+Formationen dehors des études universitaires
+ex: Langue
+-Expériences professionnelles
+stage, ...
+-Activités et Loisirs
+
+
+
+Contact: 034 52 669 69
+nyandoranarison@gmail.com

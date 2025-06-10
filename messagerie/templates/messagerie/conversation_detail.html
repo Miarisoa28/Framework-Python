@@ -1,0 +1,662 @@
+{% extends 'messagerie/base.html' %}
+{% load widget_tweaks %}
+{% load messagerie_filters %}
+
+{% block title %}Conversation avec {{ nom_a_afficher }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Styles spécifiques à conversation_detail.html */
+    .message-container {
+        max-height: 500px;
+        overflow-y: auto;
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+    }
+    .message {
+        border-radius: 15px;
+        padding: 10px 15px;
+        margin-bottom: 10px;
+        max-width: 70%;
+        word-wrap: break-word;
+        box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+        position: relative; /* Important pour positionner le bouton de suppression */
+    }
+    .sent {
+        margin-left: auto;
+    }
+    .received {
+        margin-right: auto;
+    }
+    .message-meta {
+        font-size: 0.75em;
+        color: #6c757d; /* Couleur par défaut pour l'heure et le statut de lecture */
+        display: flex; /* Pour aligner l'heure et le bouton de suppression */
+        align-items: center;
+        justify-content: flex-end; /* Aligner à droite pour les messages envoyés */
+        margin-top: 5px;
+    }
+    .message.received .message-meta {
+        justify-content: flex-start; /* Aligner à gauche pour les messages reçus */
+    }
+    .online-indicator {
+        width: 10px;
+        height: 10px;
+        background-color: #28a745;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+    }
+    .offline-indicator {
+        width: 10px;
+        height: 10px;
+        background-color: #dc3545;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+    }
+    .attachment-btn, .audio-btn {
+        flex-shrink: 0; /* Empêche le bouton de réduire sa taille */
+    }
+    .send-btn {
+        flex-shrink: 0;
+    }
+    textarea.form-control {
+        resize: none; /* Empêche l'utilisateur de redimensionner la textarea */
+    }
+    .file-preview-area {
+        border: 1px solid #e0e0e0;
+        border-radius: 5px;
+        padding: 10px;
+        margin-top: 10px;
+    }
+    .file-preview-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 5px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .file-preview-item:last-child {
+        margin-bottom: 0;
+    }
+    .file-preview-item img,
+    .file-preview-item audio,
+    .file-preview-item video {
+        max-width: 80px;
+        max-height: 80px;
+        margin-right: 10px;
+        border-radius: 4px;
+        object-fit: cover;
+    }
+    .file-name-display {
+        flex-grow: 1;
+        font-size: 0.9em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 0;
+    }
+    .clear-file-preview-btn {
+        margin-left: 10px;
+        background: none;
+        border: none;
+        font-size: 1.2em;
+        cursor: pointer;
+        color: #aaa;
+    }
+    .clear-file-preview-btn:hover {
+        color: #dc3545;
+    }
+    #audio-playback {
+        width: 100%;
+        margin-top: 10px;
+    }
+    #record-audio-btn.recording {
+        background-color: #dc3545;
+        color: white;
+    }
+
+    /* NOUVEAUX STYLES pour les messages supprimés */
+    .message.deleted-message {
+        opacity: 0.6; /* Rendre le message un peu transparent */
+        background-color: #f0f0f0 !important; /* Couleur neutre par défaut pour le mode clair */
+        color: #777 !important; /* Texte gris */
+        box-shadow: none; /* Pas d'ombre pour un message supprimé */
+    }
+    body.dark-mode .message.deleted-message {
+        background-color: #333 !important; /* Un gris plus foncé en mode sombre */
+        color: #bbb !important; /* Texte légèrement plus clair en mode sombre */
+    }
+    .message.deleted-message .message-content {
+        filter: blur(0.5px); /* Optionnel: légère flou pour indiquer la suppression */
+    }
+    .message.deleted-message .message-content p {
+        font-style: italic;
+        color: inherit; /* Utilise la couleur héritée du parent */
+    }
+    .message.deleted-message .message-meta small {
+        color: inherit !important; /* Le texte de l'heure reste lisible */
+    }
+    /* Masquer les médias et les liens dans les messages supprimés */
+    .message.deleted-message .message-content img,
+    .message.deleted-message .message-content audio,
+    .message.deleted-message .message-content video,
+    .message.deleted-message .message-content a.download-encrypted-file {
+        display: none !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <div>
+            {% if autre_participant and autre_participant.statut.est_en_ligne %}
+                <span class="online-indicator"></span>
+            {% elif not autre_participant %}
+                {# Pas d'indicateur en discussion de groupe #}
+            {% else %}
+                <span class="offline-indicator"></span>
+            {% endif %}
+            <strong>{{ nom_a_afficher }}</strong>
+        </div>
+    </div>
+    
+    <div class="card-body message-container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="message {% if message.expediteur == user %}sent{% else %}received{% endif %} {% if message.supprime_par_expediteur %}deleted-message{% endif %}"
+                     data-message-id="{{ message.id }}"> {# Ajout de l'ID du message #}
+                    <div>
+                        {% if conversation.groupe_discussion %}
+                            <strong>{{ message.expediteur.nom }}</strong>
+                        {% elif message.expediteur != user %}
+                            <strong>{{ message.expediteur.nom }}</strong>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="message-content">
+                        {% if message.supprime_par_expediteur %}
+                            <p class="text-muted fst-italic"><i class="fas fa-trash-alt me-1"></i> Ce message a été supprimé.</p>
+                        {% else %}
+                            {# Contenu normal du message si non supprimé #}
+                            {% if message.contenu %}
+                                <p>{{ message.contenu }}</p>
+                            {% elif message.fichier %}
+                                {% with filename=message.fichier.name|cut:'fichiers_messages/' %}
+                                    {% if message.chiffred_data_base64 %}
+                                        {# Détection du type de fichier par extension pour un affichage adapté #}
+                                        {% if filename|lower|ends_with:".jpg" or filename|lower|ends_with:".jpeg" or filename|lower|ends_with:".png" or filename|lower|ends_with:".gif" %}
+                                            <img src="#" class="encrypted-image-display" 
+                                                 data-content="{{ message.chiffred_data_base64 }}" 
+                                                 alt="Image jointe" loading="lazy">
+                                            <p class="file-name-text"><i class="fas fa-image"></i> {{ filename }}</p>
+                                        {% elif filename|lower|ends_with:".mp3" or filename|lower|ends_with:".wav" or filename|lower|ends_with:".ogg" or filename|lower|ends_with:".webm" %}
+                                            <audio controls class="play-encrypted-audio" 
+                                                   data-content="{{ message.chiffred_data_base64 }}">
+                                                Votre navigateur ne supporte pas l'élément audio.
+                                            </audio>
+                                            <p class="file-name-text"><i class="fas fa-music"></i> {{ filename }}</p>
+                                        {% elif filename|lower|ends_with:".mp4" or filename|lower|ends_with:".webm" or filename|lower|ends_with:".ogg" %}
+                                            <video controls class="play-encrypted-video" 
+                                                   data-content="{{ message.chiffred_data_base64 }}"
+                                                   loading="lazy">
+                                                Votre navigateur ne supporte pas l'élément vidéo.
+                                            </video>
+                                            <p class="file-name-text"><i class="fas fa-video"></i> {{ filename }}</p>
+                                        {% else %}
+                                            <a href="#" class="download-encrypted-file" 
+                                               data-filename="{{ filename }}" 
+                                               data-content="{{ message.chiffred_data_base64 }}"
+                                               title="Cliquez pour télécharger le fichier">
+                                               <i class="fas fa-file"></i> Télécharger {{ filename }}
+                                            </a>
+                                        {% endif %}
+                                    {% else %}
+                                        <a href="{{ message.fichier.url }}" download><i class="fas fa-file"></i> Télécharger {{ message.fichier.name|cut:'fichiers_messages/' }}</a>
+                                    {% endif %}
+                                {% endwith %}
+                            {% elif message.message_vocal %}
+                                <p>Message vocal : 
+                                    {% if message.chiffred_data_base64 %}
+                                        <audio controls class="play-encrypted-audio" 
+                                               data-content="{{ message.chiffred_data_base64 }}">
+                                            Votre navigateur ne supporte pas l'élément audio.
+                                        </audio>
+                                    {% else %}
+                                        <audio controls>
+                                            <source src="{{ message.message_vocal.url }}" type="audio/mpeg">
+                                            Votre navigateur ne supporte pas l'élément audio.
+                                        </audio>
+                                    {% endif %}
+                                </p>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+
+                    <div class="message-meta"> {# Retiré text-end car aligné par flexbox maintenant #}
+                        <small>
+                            {{ message.date_envoi|date:"H:i" }}
+                            {% if message.est_lu and message.expediteur == user %}
+                                <span class="ms-1">✓</span>
+                            {% endif %}
+                        </small>
+                        
+                        {# NOUVEAU : Bouton Supprimer #}
+                        {% if message.expediteur == user and not message.supprime_par_expediteur %}
+                            <button class="btn btn-sm btn-outline-danger delete-message-btn ms-2"
+                                    data-message-id="{{ message.id }}"
+                                    title="Supprimer ce message">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="text-center text-muted my-5">
+                <p>Aucun message. Commencez la conversation !</p>
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="card-footer">
+        <form method="post" class="mb-0" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="input-group">
+                {{ form.contenu|attr:"placeholder:Écrivez votre message..." }}
+                
+                <label for="{{ form.fichier.id_for_label }}" class="btn btn-outline-secondary attachment-btn" title="Joindre un fichier">
+                    <i class="fas fa-paperclip"></i>
+                </label>
+                {{ form.fichier }} 
+
+                <button type="button" id="record-audio-btn" class="btn btn-outline-secondary audio-btn" title="Enregistrer un message vocal">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <audio id="audio-playback" controls style="display: none;"></audio>
+                {{ form.message_vocal }}
+                
+                <button type="submit" class="btn btn-primary send-btn">Envoyer</button>
+            </div>
+            
+            <div id="file-preview-area" class="mt-2" style="display: none;">
+                <div id="image-preview" class="file-preview-item" style="display: none;">
+                    <img src="#" alt="Prévisualisation de l'image">
+                    <p class="file-name-display"></p>
+                    <button type="button" class="btn btn-sm btn-danger clear-file-preview-btn"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="audio-file-preview" class="file-preview-item" style="display: none;">
+                    <audio controls></audio>
+                    <p class="file-name-display"></p>
+                    <button type="button" class="btn btn-sm btn-danger clear-file-preview-btn"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="video-file-preview" class="file-preview-item" style="display: none;">
+                    <video controls></video>
+                    <p class="file-name-display"></p>
+                    <button type="button" class="btn btn-sm btn-danger clear-file-preview-btn"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="other-file-preview" class="file-preview-item" style="display: none;">
+                    <p><i class="fas fa-file"></i> <span class="file-name-display"></span></p>
+                    <button type="button" class="btn btn-sm btn-danger clear-file-preview-btn"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+
+            {% if form.errors %}
+                <div class="alert alert-danger mt-2" role="alert">
+                    {% for field in form %}
+                        {% if field.errors %}
+                            {% for error in field.errors %}
+                                <p>{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if form.non_field_errors %}
+                        {% for error in form.non_field_errors %}
+                            <p>{{ error }}</p>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            {% endif %}
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Fait défiler automatiquement vers le bas des messages
+    const messageContainer = document.querySelector('.message-container');
+    setTimeout(() => {
+        messageContainer.scrollTop = messageContainer.scrollHeight;
+    }, 100);
+
+    // Masquer les champs FileField et FileInput par défaut et les styliser avec des labels
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelector('[name="fichier"]').style.display = 'none';
+        document.querySelector('[name="message_vocal"]').style.display = 'none';
+        
+        // Cacher les contrôles audio si aucun enregistrement n'a été fait
+        document.getElementById('audio-playback').style.display = 'none';
+        
+        updateFormFieldsState();
+    });
+
+    // --- Références aux éléments du DOM ---
+    const fileInput = document.querySelector('[name="fichier"]');
+    const messageContenuInput = document.querySelector('[name="contenu"]');
+    const messageVocalInput = document.querySelector('[name="message_vocal"]');
+    const recordAudioBtn = document.getElementById('record-audio-btn');
+    const audioPlayback = document.getElementById('audio-playback');
+    const sendButton = document.querySelector('.send-btn');
+    const form = document.querySelector('form');
+
+    // Éléments de prévisualisation des fichiers
+    const filePreviewArea = document.getElementById('file-preview-area');
+    const imagePreview = document.getElementById('image-preview');
+    const audioFilePreview = document.getElementById('audio-file-preview');
+    const videoFilePreview = document.getElementById('video-file-preview');
+    const otherFilePreview = document.getElementById('other-file-preview');
+    const clearFilePreviewBtns = document.querySelectorAll('.clear-file-preview-btn');
+
+    // Variables pour l'enregistrement vocal
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+
+    // --- Fonctions utilitaires ---
+    function hideAllFilePreviews() {
+        filePreviewArea.style.display = 'none';
+        imagePreview.style.display = 'none';
+        audioFilePreview.style.display = 'none';
+        videoFilePreview.style.display = 'none';
+        otherFilePreview.style.display = 'none';
+        
+        imagePreview.querySelector('img').src = '#';
+        audioFilePreview.querySelector('audio').src = '#';
+        videoFilePreview.querySelector('video').src = '#';
+    }
+
+    // Fonction de décodage Base64 vers Uint8Array (pour les données binaires)
+    function base64ToBytes(base64) {
+        try {
+            // Remplacer les tirets '-' par des '+' et les underscores '_' par des '/'
+            // puis ajouter le remplissage s'il manque
+            base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+            while (base64.length % 4) {
+                base64 += '=';
+            }
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes;
+        } catch (e) {
+            console.error("Erreur de décodage Base64:", e);
+            return new Uint8Array(0);
+        }
+    }
+
+    // --- Gestion de l'état des champs de formulaire ---
+    function updateFormFieldsState() {
+        const isTextFilled = messageContenuInput.value.trim() !== '';
+        const isFileSelected = fileInput.files.length > 0;
+        const isVoiceMessageSelected = messageVocalInput.files.length > 0;
+
+        messageContenuInput.disabled = isFileSelected || isVoiceMessageSelected || isRecording;
+        fileInput.disabled = isTextFilled || isVoiceMessageSelected || isRecording;
+        recordAudioBtn.disabled = isTextFilled || isFileSelected || isRecording;
+
+        sendButton.disabled = !(isTextFilled || isFileSelected || isVoiceMessageSelected) || isRecording;
+
+        if (isTextFilled || isVoiceMessageSelected) {
+            hideAllFilePreviews();
+            fileInput.value = '';
+        }
+        if (isTextFilled || isFileSelected) {
+            audioPlayback.style.display = 'none';
+            messageVocalInput.value = '';
+            recordAudioBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            recordAudioBtn.classList.remove('recording');
+            isRecording = false;
+        }
+    }
+
+    // --- Écouteurs d'événements pour le formulaire ---
+    fileInput.addEventListener('change', function() {
+        hideAllFilePreviews();
+        if (this.files.length > 0) {
+            const file = this.files[0];
+            const fileNameDisplay = file.name;
+            const fileType = file.type;
+            filePreviewArea.style.display = 'block';
+
+            if (fileType.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.querySelector('img').src = e.target.result;
+                    imagePreview.querySelector('.file-name-display').textContent = fileNameDisplay;
+                    imagePreview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else if (fileType.startsWith('audio/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    audioFilePreview.querySelector('audio').src = e.target.result;
+                    audioFilePreview.querySelector('.file-name-display').textContent = fileNameDisplay;
+                    audioFilePreview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else if (fileType.startsWith('video/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    videoFilePreview.querySelector('video').src = e.target.result;
+                    videoFilePreview.querySelector('.file-name-display').textContent = fileNameDisplay;
+                    videoFilePreview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                otherFilePreview.querySelector('.file-name-display').textContent = fileNameDisplay;
+                otherFilePreview.style.display = 'block';
+            }
+        }
+        updateFormFieldsState();
+    });
+
+    clearFilePreviewBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            fileInput.value = '';
+            hideAllFilePreviews();
+            updateFormFieldsState();
+        });
+    });
+
+    messageContenuInput.addEventListener('input', updateFormFieldsState);
+
+    recordAudioBtn.addEventListener('click', async () => {
+        if (!isRecording) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = []; // Réinitialiser les chunks pour un nouvel enregistrement
+                mediaRecorder.start();
+                isRecording = true;
+
+                recordAudioBtn.innerHTML = '<i class="fas fa-stop"></i> Arrêter';
+                recordAudioBtn.classList.add('recording');
+                
+                updateFormFieldsState();
+                hideAllFilePreviews(); // Masquer les prévisualisations de fichiers
+                audioPlayback.style.display = 'none'; // Masquer le lecteur audio précédent
+                messageVocalInput.value = ''; // Vider l'input vocal précédent
+
+                mediaRecorder.addEventListener('dataavailable', event => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener('stop', () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioPlayback.src = audioUrl;
+                    audioPlayback.style.display = 'block';
+
+                    const audioFile = new File([audioBlob], `voice_message_${new Date().getTime()}.webm`, { type: 'audio/webm' });
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(audioFile);
+                    messageVocalInput.files = dataTransfer.files;
+
+                    recordAudioBtn.innerHTML = '<i class="fas fa-redo"></i> Ré-enregistrer';
+                    recordAudioBtn.classList.remove('recording');
+                    isRecording = false;
+                    updateFormFieldsState();
+                });
+            } catch (err) {
+                console.error('Erreur d\'accès au microphone:', err);
+                alert('Impossible d\'accéder au microphone. Veuillez vérifier les permissions.');
+                recordAudioBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                recordAudioBtn.classList.remove('recording');
+                isRecording = false;
+                updateFormFieldsState();
+            }
+        } else {
+            mediaRecorder.stop();
+        }
+    });
+
+    form.addEventListener('submit', function(e) {
+        const isTextValid = messageContenuInput.value.trim() !== '' && !messageContenuInput.disabled;
+        const isFileValid = fileInput.files.length > 0 && !fileInput.disabled;
+        const isVoiceValid = messageVocalInput.files.length > 0 && !messageVocalInput.disabled;
+
+        if (!isTextValid && !isFileValid && !isVoiceValid) {
+            e.preventDefault();
+            alert("Veuillez saisir un message texte, sélectionner un fichier ou enregistrer un message vocal.");
+        }
+    });
+
+    // --- Logique d'affichage et de "déchiffrement" des médias dans la conversation ---
+    // Note: Assurez-vous que la fonction de déchiffrement réelle (avec vos clés) est appliquée ici
+    // La fonction base64ToBytes est un début, mais le déchiffrement AES/RSA doit se faire AVANT.
+    document.querySelectorAll('.encrypted-image-display').forEach(img => {
+        const encryptedContentBase64 = img.dataset.content;
+        try {
+            // Ici, vous devriez appeler votre fonction de déchiffrement (par exemple, decryptAES(encryptedContentBase64, key, iv))
+            // Pour l'exemple, nous nous contentons de décoder le base64
+            const decryptedBytes = base64ToBytes(encryptedContentBase64);
+            const blob = new Blob([decryptedBytes], { type: 'image/jpeg' }); // Assurez le bon type MIME
+            img.src = URL.createObjectURL(blob);
+        } catch (error) {
+            console.error("Erreur lors du traitement de l'image chiffrée:", error);
+            img.src = '#'; 
+            img.alt = 'Erreur de chargement de l\'image';
+        }
+    });
+
+    document.querySelectorAll('.play-encrypted-audio').forEach(audioPlayer => {
+        const encryptedContentBase64 = audioPlayer.dataset.content;
+        try {
+            // Ici, vous devriez appeler votre fonction de déchiffrement
+            const decryptedBytes = base64ToBytes(encryptedContentBase64);
+            const blob = new Blob([decryptedBytes], { type: 'audio/webm' }); // Assurez le bon type MIME
+            audioPlayer.src = URL.createObjectURL(blob);
+        } catch (error) {
+            console.error("Erreur lors du traitement de l'audio chiffré:", error);
+        }
+    });
+
+    document.querySelectorAll('.play-encrypted-video').forEach(videoPlayer => {
+        const encryptedContentBase64 = videoPlayer.dataset.content;
+        try {
+            // Ici, vous devriez appeler votre fonction de déchiffrement
+            const decryptedBytes = base64ToBytes(encryptedContentBase64);
+            const blob = new Blob([decryptedBytes], { type: 'video/mp4' }); // Assurez le bon type MIME
+            videoPlayer.src = URL.createObjectURL(blob);
+        } catch (error) {
+            console.error("Erreur lors du traitement de la vidéo chiffrée:", error);
+        }
+    });
+
+    document.querySelectorAll('.download-encrypted-file').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const filename = link.dataset.filename;
+            const encryptedContentBase64 = link.dataset.content;
+            
+            try {
+                // Ici, vous devriez appeler votre fonction de déchiffrement
+                const decryptedBytes = base64ToBytes(encryptedContentBase64);
+                const blob = new Blob([decryptedBytes], { type: 'application/octet-stream' });
+                
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error("Erreur lors du déchiffrement/téléchargement du fichier:", error);
+                alert("Impossible de télécharger le fichier. Erreur de déchiffrement.");
+            }
+        });
+    });
+
+    // --- NOUVEAU : Logique de suppression des messages ---
+    document.querySelectorAll('.delete-message-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            const messageId = this.dataset.messageId;
+            const messageElement = this.closest('.message'); // Trouve l'élément parent .message
+
+            if (confirm("Êtes-vous sûr de vouloir supprimer ce message ? Cette action est irréversible pour vous.")) {
+                try {
+                    const response = await fetch(`/messagerie/message/${messageId}/delete/`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': '{{ csrf_token }}', // Important pour Django
+                            'X-Requested-With': 'XMLHttpRequest' // Indique une requête AJAX
+                        }
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        if (data.status === 'success') {
+                            // Mettre à jour l'affichage du message dans le DOM
+                            messageElement.classList.add('deleted-message');
+                            // Remplacer le contenu par le texte "Ce message a été supprimé."
+                            const messageContentDiv = messageElement.querySelector('.message-content');
+                            if (messageContentDiv) {
+                                messageContentDiv.innerHTML = '<p class="text-muted fst-italic"><i class="fas fa-trash-alt me-1"></i> Ce message a été supprimé.</p>';
+                            }
+                            // Masquer le bouton de suppression lui-même
+                            this.style.display = 'none'; 
+
+                            console.log(data.message);
+                            // Optionnel: Afficher un message de succès à l'utilisateur (via un toast ou une alerte)
+                            // Exemple simple: alert(data.message);
+                        } else {
+                            console.error('Erreur de suppression:', data.message);
+                            alert('Erreur lors de la suppression: ' + data.message);
+                        }
+                    } else {
+                        console.error('Erreur HTTP lors de la suppression:', response.status, data.message);
+                        alert('Erreur du serveur lors de la suppression: ' + data.message);
+                    }
+                } catch (error) {
+                    console.error('Erreur réseau ou JavaScript:', error);
+                    alert('Une erreur inattendue est survenue lors de la suppression du message.');
+                }
+            }
+        });
+    });
+
+</script>
+{% endblock %}

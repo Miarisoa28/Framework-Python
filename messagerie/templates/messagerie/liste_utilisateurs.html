@@ -1,0 +1,30 @@
+{% extends 'messagerie/base.html' %}
+
+{% block title %}Liste des utilisateurs{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Utilisateurs disponibles</h5>
+    </div>
+    <div class="list-group list-group-flush">
+        {% for utilisateur in utilisateurs %}
+        <a href="{% url 'nouvelle_conversation' utilisateur.id %}" class="list-group-item list-group-item-action">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    {% if utilisateur.statut.est_en_ligne %}
+                    <span class="online-indicator"></span>
+                    {% else %}
+                    <span class="offline-indicator"></span>
+                    {% endif %}
+                    {{ utilisateur.nom }}
+                </div>
+                <span class="badge bg-primary">Démarrer une conversation</span>
+            </div>
+        </a>
+        {% empty %}
+        <div class="list-group-item">Aucun autre utilisateur disponible</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

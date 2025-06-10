@@ -1,0 +1,39 @@
+{% extends 'messagerie/base.html' %}
+
+{% block content %}
+  <h2 class="mb-4">Créer un groupe de discussion</h2>
+
+  {% if messages %}
+    <div>
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" class="mb-3">
+    {% csrf_token %}
+    
+    <!-- Nouveau champ pour le nom du groupe -->
+    <div class="mb-3">
+      <label for="nom_groupe" class="form-label">Nom du groupe :</label>
+      <input type="text" id="nom_groupe" name="nom_groupe" class="form-control" placeholder="Entrez le nom du groupe" required>
+    </div>
+
+    <div class="mb-3">
+      <label for="participants" class="form-label">Sélectionnez les participants :</label>
+      <select name="participants" id="participants" class="form-select" multiple size="10" required>
+        {% for utilisateur in utilisateurs %}
+          <option value="{{ utilisateur.id }}">{{ utilisateur.get_full_name }} ({{ utilisateur.email }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Créer le groupe</button>
+  </form>
+
+  <a href="{% url 'liste_conversations' %}" class="btn btn-link">← Retour à la liste des conversations</a>
+{% endblock %}
